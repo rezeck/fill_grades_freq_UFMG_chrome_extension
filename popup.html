@@ -6,52 +6,50 @@
 </head>
 
 <body>
-    <div class="container">
-        <div class="left-content">
-            <h2>UFMG Auto-Filler</h2>
-        </div>
-        <div class="right-content">
-            <a href="https://github.com/h3ct0r/fill_grades_freq_UFMG_chrome_extension" target="_blank"
-                style="font-size:10px; vertical-align: middle; text-decoration: none;">Docs &
-                code&nbsp;
-                <img src="icons/github-logo.png" style="vertical-align: middle; width:16px;" /></a>
-        </div>
+    <div class="header-row">
+        <h2>UFMG Auto-Filler</h2>
+        <a href="https://github.com/h3ct0r/fill_grades_freq_UFMG_chrome_extension" target="_blank">
+            Docs &amp; code
+            <img src="icons/github-logo.png" alt="" />
+        </a>
     </div>
 
-
-    <div class="container" id="interface-frequency" style="display: none;">
-        <p>Fill frequency using a CSV.</p>
+    <div class="panel" id="interface-frequency" style="display: none;">
+        <p class="slim-no-margin">Fill frequency using a CSV.</p>
 
         <div id="frequency-step-1">
-            <p class="slim-no-margin" style="font-weight: bold; text-decoration: underline;"><span
-                    class="step-status">&#10060;</span> Step 1: Check for
-                total frequency
-                headers</p>
+            <p class="slim-no-margin" style="font-weight: bold; text-decoration: underline;">
+                <span class="step-status">&#10060;</span> Step 1: Check for total frequency headers
+            </p>
             <ul>
-                <li><b>Headers found:</b> <span id="headersFreqFound" class="red-color">None</span></p>
-                </li>
+                <li><b>Headers found:</b> <span id="headersFreqFound" class="red-color">None</span></li>
             </ul>
         </div>
 
-        <div id="frequency-step-2" style="display:none; margin-bottom:1em;">
+        <div id="frequency-step-2" style="display:none;">
             <p class="slim-no-margin" style="font-weight: bold; text-decoration: underline;">
                 Step 2: Upload frequency CSV file <span class="step-status"></span>
             </p>
             <ul>
-                <li>
-                    CSV headers for <i>frequency</i>: <span id="freqCsvHeadersOK" class="red-color">-</span>
-                </li>
+                <li>CSV headers: <span id="freqCsvHeadersOK" class="red-color">-</span></li>
                 <li>N&deg; valid rows: <span id="freqCsvElementsDesc" class="red-color">0</span></li>
             </ul>
 
-            <div style="text-align: center;">
-                <label>
-                    <input type="file" id="freqCsvInput" accept=".csv" />
-                </label>
+            <p class="popup-note">Arraste o CSV abaixo. Se escolher arquivo, o popup pode fechar — reabra depois.</p>
+            <div class="drop-zone" id="freqCsvDropZone">
+                <span class="drop-zone-icon">&#128196;</span>
+                <p class="drop-hint">Arraste o CSV aqui</p>
+                <button type="button" class="file-btn" id="freqCsvBrowseBtn">Escolher arquivo</button>
+                <input type="file" id="freqCsvInput" accept=".csv" />
+            </div>
+
+            <div id="frequency-column-picker" class="column-picker" style="display:none;">
+                <p class="column-picker-title">Colunas para preencher</p>
+                <div id="freqColumnList" class="column-list"></div>
             </div>
         </div>
 
-        <div id="frequency-step-3" style="display:none; margin-bottom:1em;">
+        <div id="frequency-step-3" style="display:none;">
             <p class="slim-no-margin" style="font-weight: bold; text-decoration: underline;">
                 Step 3: Fill the frequency
             </p>
@@ -60,43 +58,48 @@
             </div>
         </div>
     </div>
-    <div class="container" id="interface-grades" style="display: none;">
-        <p>Fill grades using a CSV.</p>
-        <p class="slim-no-margin">
-            The CSV should have the same headers than the AV
-            headers found on the page (case
-            sensitive).</p>
 
-        <div id="grades-step-1" style="margin-top: 1em;">
-            <p class="slim-no-margin" style="font-weight: bold; text-decoration: underline;">Step 1: Check for
-                current AV
-                headers <span class="step-status">&#10060;</span></p>
+    <div class="panel" id="interface-grades" style="display: none;">
+        <p class="slim-no-margin">Fill grades using a CSV.</p>
+        <p class="popup-note">O CSV precisa ter a coluna MATRICULA. Escolha abaixo quais colunas preencher.</p>
+
+        <div id="grades-step-1">
+            <p class="slim-no-margin" style="font-weight: bold; text-decoration: underline;">
+                Step 1: Check for current AV headers <span class="step-status">&#10060;</span>
+            </p>
             <ul>
-                <li><b>Headers found:</b> <span id="headersAVFound" class="red-color">None</span></p>
-                </li>
+                <li><b>Headers found:</b> <span id="headersAVFound" class="red-color">None</span></li>
             </ul>
         </div>
 
-        <div id="grades-step-2" style="display:none; margin-bottom:1em;">
+        <div id="grades-step-2" style="display:none;">
             <p class="slim-no-margin" style="font-weight: bold; text-decoration: underline;">
-                Step 2: Upload CSV file <i>AV's</i> grades <span class="step-status"></span>
+                Step 2: Upload CSV file <span class="step-status"></span>
             </p>
             <ul>
-                <li>
-                    CSV headers for AV: <span id="csvHeadersOK" class="red-color">-</span>
-                </li>
+                <li>CSV headers: <span id="csvHeadersOK" class="red-color">-</span></li>
                 <li>N&deg; valid rows: <span id="csvElementsDesc" class="red-color">0</span></li>
             </ul>
 
-            <div style="text-align: center;">
-                <label>
-                    <input type="file" id="csvInput" accept=".csv" />
-                </label>
+            <p class="popup-note">Arraste o CSV abaixo. Se escolher arquivo, o popup pode fechar — reabra depois.</p>
+            <div class="drop-zone" id="csvDropZone">
+                <span class="drop-zone-icon">&#128196;</span>
+                <p class="drop-hint">Arraste o CSV aqui</p>
+                <button type="button" class="file-btn" id="csvBrowseBtn">Escolher arquivo</button>
+                <input type="file" id="csvInput" accept=".csv" />
             </div>
 
+            <div id="grades-column-picker" class="column-picker" style="display:none;">
+                <p class="column-picker-title">Colunas para preencher</p>
+                <div class="column-actions">
+                    <button type="button" id="gradesSelectAllBtn">Marcar todas</button>
+                    <button type="button" id="gradesSelectNoneBtn">Desmarcar</button>
+                </div>
+                <div id="gradesColumnList" class="column-list"></div>
+            </div>
         </div>
 
-        <div id="grades-step-3" style="display:none; margin-bottom:1em;">
+        <div id="grades-step-3" style="display:none;">
             <p class="slim-no-margin" style="font-weight: bold; text-decoration: underline;">
                 Step 3: Fill the grades
             </p>

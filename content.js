@@ -1,3 +1,7 @@
+function isInputEditable(input) {
+    return input && !input.disabled && !input.readOnly;
+}
+
 function getAvHeadersMap() {
     var avToId = new Map();
 
@@ -69,61 +73,83 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         try {
             const csvDataMap = new Map(Object.entries(request.data));
+            const columnsToFill = request.columns || null;
 
             let filledCount = 0;
-            let missingFieldsSet = new Set([]);
+            let blockedMatriculas = new Set([]);
+            let missingMatriculas = new Set([]);
 
             var avToId = getAvHeadersMap();
             console.log("avToId:", avToId);
-
             console.log("csvDataMap:", csvDataMap);
 
-            // iterate through CSV data
             for (const [matricula, value] of csvDataMap) {
+                if (!value || Object.keys(value).length === 0) continue;
+
                 console.log(matricula, value);
 
-                var isFound = true;
+                var fieldsFilled = 0;
+                var fieldsBlocked = 0;
+                var fieldsMissing = 0;
+
                 for (var avKeyName in value) {
+                    if (columnsToFill && !columnsToFill.includes(avKeyName)) continue;
                     if (!avToId.has(avKeyName)) continue;
 
                     var avKeyId = avToId.get(avKeyName);
                     var avValue = value[avKeyName];
+                    if (avValue == null || String(avValue).trim() === "") continue;
 
-                    // use the weird field id `@XXXXX_Y` for each one of the evaluations
-                    // where XXXX is the matricula and Y is the evaluation index
                     var idAvName = "@" + matricula + "_" + avKeyId;
                     var avMatriculaKey = document.getElementById(idAvName);
-                    if (!avMatriculaKey || avMatriculaKey.disabled) {
-                        isFound = false;
-                        missingFieldsSet.add(matricula);
+
+                    if (!avMatriculaKey) {
+                        fieldsMissing++;
                         continue;
                     }
 
-                    // the form uses comma-separated decimal places
-                    avValue = avValue.replace(/\./g, ',');
+                    if (!isInputEditable(avMatriculaKey)) {
+                        fieldsBlocked++;
+                        continue;
+                    }
+
+                    avValue = String(avValue).replace(/\./g, ',');
                     avMatriculaKey.value = avValue;
+                    fieldsFilled++;
                 }
 
-                if (isFound) filledCount++;
+                if (fieldsFilled > 0) {
+                    filledCount++;
+                }
+                if (fieldsFilled === 0 && fieldsBlocked > 0) {
+                    blockedMatriculas.add(matricula);
+                } else if (fieldsFilled === 0 && fieldsMissing > 0) {
+                    missingMatriculas.add(matricula);
+                } else if (fieldsBlocked > 0) {
+                    blockedMatriculas.add(matricula);
+                }
             }
 
             if (filledCount === 0) {
-                // error
+                let message = "Nenhum campo preenchido.";
+                if (blockedMatriculas.size > 0) {
+                    message += ` ${blockedMatriculas.size} aluno(s) com campos bloqueados (ex.: trancamento).`;
+                }
                 sendResponse({
                     status: "error",
-                    message: "No matching form fields found"
-                });
-            } else if (missingFieldsSet.length > 0) {
-                // partial success
-                sendResponse({
-                    status: "success",
-                    message: `Filled ${filledCount} rows. Could not find: ${missingFieldsSet.length}`
+                    message: message
                 });
             } else {
-                // full success
+                let message = `Preenchidas ${filledCount} linha(s).`;
+                if (blockedMatriculas.size > 0) {
+                    message += ` Ignoradas ${blockedMatriculas.size} bloqueada(s).`;
+                }
+                if (missingMatriculas.size > 0) {
+                    message += ` ${missingMatriculas.size} nao encontrada(s).`;
+                }
                 sendResponse({
                     status: "success",
-                    message: `Filled ${filledCount} rows`
+                    message: message
                 });
             }
 
@@ -157,20 +183,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             const csvDataMap = new Map(Object.entries(request.data));
 
             let filledCount = 0;
-            let missingFieldsSet = new Set([]);
+            let blockedMatriculas = new Set([]);
+            let missingMatriculas = new Set([]);
 
-            // iterate through CSV data
             for (const [matricula, value] of csvDataMap) {
                 var freqValue = value["FREQ"];
+                if (freqValue == null || String(freqValue).trim() === "") continue;
+
                 console.log(matricula, freqValue);
 
-                // use the weird field id `@XXXXX_Y` for each one of the evaluations
-                // where XXXX is the matricula and Y is the evaluation index
                 var idFreqName = "@" + matricula;
                 var freqByName = document.getElementsByName(idFreqName);
-                if (!idFreqName || freqByName.length <= 0 || freqByName[0].disabled) {
-                    isFound = false;
-                    missingFieldsSet.add(matricula);
+                if (freqByName.length <= 0) {
+                    missingMatriculas.add(matricula);
+                    continue;
+                }
+
+                if (!isInputEditable(freqByName[0])) {
+                    blockedMatriculas.add(matricula);
                     continue;
                 }
 
@@ -179,22 +209,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
 
             if (filledCount === 0) {
-                // error
+                let message = "Nenhum campo preenchido.";
+                if (blockedMatriculas.size > 0) {
+                    message += ` ${blockedMatriculas.size} aluno(s) com campos bloqueados.`;
+                }
                 sendResponse({
                     status: "error",
-                    message: "No matching form fields found"
-                });
-            } else if (missingFieldsSet.length > 0) {
-                // partial success
-                sendResponse({
-                    status: "success",
-                    message: `Filled ${filledCount} rows. Could not find: ${missingFieldsSet.length}`
+                    message: message
                 });
             } else {
-                // full success
+                let message = `Preenchidas ${filledCount} linha(s).`;
+                if (blockedMatriculas.size > 0) {
+                    message += ` Ignoradas ${blockedMatriculas.size} bloqueada(s).`;
+                }
+                if (missingMatriculas.size > 0) {
+                    message += ` ${missingMatriculas.size} nao encontrada(s).`;
+                }
                 sendResponse({
                     status: "success",
-                    message: `Filled ${filledCount} rows`
+                    message: message
                 });
             }
 
@@ -203,4 +236,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
     }
 
+    return true;
 });
