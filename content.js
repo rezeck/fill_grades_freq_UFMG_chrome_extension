@@ -131,21 +131,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
 
             if (filledCount === 0) {
-                let message = "Nenhum campo preenchido.";
+                let message = "No fields were filled.";
                 if (blockedMatriculas.size > 0) {
-                    message += ` ${blockedMatriculas.size} aluno(s) com campos bloqueados (ex.: trancamento).`;
+                    message += ` ${blockedMatriculas.size} student(s) had blocked fields (e.g. withdrawal).`;
                 }
                 sendResponse({
                     status: "error",
                     message: message
                 });
             } else {
-                let message = `Preenchidas ${filledCount} linha(s).`;
+                let message = `Filled ${filledCount} row(s).`;
                 if (blockedMatriculas.size > 0) {
-                    message += ` Ignoradas ${blockedMatriculas.size} bloqueada(s).`;
+                    message += ` Skipped ${blockedMatriculas.size} blocked row(s).`;
                 }
                 if (missingMatriculas.size > 0) {
-                    message += ` ${missingMatriculas.size} nao encontrada(s).`;
+                    message += ` ${missingMatriculas.size} not found.`;
                 }
                 sendResponse({
                     status: "success",
@@ -209,21 +209,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
 
             if (filledCount === 0) {
-                let message = "Nenhum campo preenchido.";
+                let message = "No fields were filled.";
                 if (blockedMatriculas.size > 0) {
-                    message += ` ${blockedMatriculas.size} aluno(s) com campos bloqueados.`;
+                    message += ` ${blockedMatriculas.size} student(s) had blocked fields.`;
                 }
                 sendResponse({
                     status: "error",
                     message: message
                 });
             } else {
-                let message = `Preenchidas ${filledCount} linha(s).`;
+                let message = `Filled ${filledCount} row(s).`;
                 if (blockedMatriculas.size > 0) {
-                    message += ` Ignoradas ${blockedMatriculas.size} bloqueada(s).`;
+                    message += ` Skipped ${blockedMatriculas.size} blocked row(s).`;
                 }
                 if (missingMatriculas.size > 0) {
-                    message += ` ${missingMatriculas.size} nao encontrada(s).`;
+                    message += ` ${missingMatriculas.size} not found.`;
                 }
                 sendResponse({
                     status: "success",

@@ -35,16 +35,16 @@
                 <li>N&deg; valid rows: <span id="freqCsvElementsDesc" class="red-color">0</span></li>
             </ul>
 
-            <p class="popup-note">Arraste o CSV abaixo. Se escolher arquivo, o popup pode fechar — reabra depois.</p>
+            <p class="popup-note">Drag the CSV below. If you choose a file, the popup may close - reopen it afterward.</p>
             <div class="drop-zone" id="freqCsvDropZone">
                 <span class="drop-zone-icon">&#128196;</span>
-                <p class="drop-hint">Arraste o CSV aqui</p>
-                <button type="button" class="file-btn" id="freqCsvBrowseBtn">Escolher arquivo</button>
+                <p class="drop-hint">Drag the CSV here</p>
+                <button type="button" class="file-btn" id="freqCsvBrowseBtn">Choose file</button>
                 <input type="file" id="freqCsvInput" accept=".csv" />
             </div>
 
             <div id="frequency-column-picker" class="column-picker" style="display:none;">
-                <p class="column-picker-title">Colunas para preencher</p>
+                <p class="column-picker-title">Columns to fill</p>
                 <div id="freqColumnList" class="column-list"></div>
             </div>
         </div>
@@ -61,7 +61,7 @@
 
     <div class="panel" id="interface-grades" style="display: none;">
         <p class="slim-no-margin">Fill grades using a CSV.</p>
-        <p class="popup-note">O CSV precisa ter a coluna MATRICULA. Escolha abaixo quais colunas preencher.</p>
+        <p class="popup-note">The CSV must include a MATRICULA column. Choose which columns to fill below.</p>
 
         <div id="grades-step-1">
             <p class="slim-no-margin" style="font-weight: bold; text-decoration: underline;">
@@ -81,19 +81,19 @@
                 <li>N&deg; valid rows: <span id="csvElementsDesc" class="red-color">0</span></li>
             </ul>
 
-            <p class="popup-note">Arraste o CSV abaixo. Se escolher arquivo, o popup pode fechar — reabra depois.</p>
+            <p class="popup-note">Drag the CSV below. If you choose a file, the popup may close - reopen it afterward.</p>
             <div class="drop-zone" id="csvDropZone">
                 <span class="drop-zone-icon">&#128196;</span>
-                <p class="drop-hint">Arraste o CSV aqui</p>
-                <button type="button" class="file-btn" id="csvBrowseBtn">Escolher arquivo</button>
+                <p class="drop-hint">Drag the CSV here</p>
+                <button type="button" class="file-btn" id="csvBrowseBtn">Choose file</button>
                 <input type="file" id="csvInput" accept=".csv" />
             </div>
 
             <div id="grades-column-picker" class="column-picker" style="display:none;">
-                <p class="column-picker-title">Colunas para preencher</p>
+                <p class="column-picker-title">Columns to fill</p>
                 <div class="column-actions">
-                    <button type="button" id="gradesSelectAllBtn">Marcar todas</button>
-                    <button type="button" id="gradesSelectNoneBtn">Desmarcar</button>
+                    <button type="button" id="gradesSelectAllBtn">Select all</button>
+                    <button type="button" id="gradesSelectNoneBtn">Clear all</button>
                 </div>
                 <div id="gradesColumnList" class="column-list"></div>
             </div>

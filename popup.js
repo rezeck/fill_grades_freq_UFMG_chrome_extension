@@ -113,7 +113,7 @@ function setupDropZone(dropZone, fileInput, browseBtn, onCsvText) {
 
         const file = event.dataTransfer?.files?.[0];
         if (!file) {
-            showStatus("Selecione um arquivo CSV.", "error");
+            showStatus("Please select a CSV file.", "error");
             return;
         }
 
@@ -124,7 +124,7 @@ function setupDropZone(dropZone, fileInput, browseBtn, onCsvText) {
 function readCsvFile(file, onCsvText) {
     const reader = new FileReader();
     reader.onload = (e) => onCsvText(e.target.result);
-    reader.onerror = () => showStatus("Falha ao ler o CSV.", "error");
+    reader.onerror = () => showStatus("Failed to read the CSV file.", "error");
     reader.readAsText(file);
 }
 
@@ -203,13 +203,13 @@ function renderGradesColumnPicker({
 
         if (fillable) {
             badge.classList.add("ok");
-            badge.textContent = "página + CSV";
+            badge.textContent = "page + CSV";
         } else if (inCsv && !onPage) {
             badge.classList.add("missing-page");
-            badge.textContent = "só no CSV";
+            badge.textContent = "CSV only";
         } else {
             badge.classList.add("missing-csv");
-            badge.textContent = "só na página";
+            badge.textContent = "page only";
         }
 
         label.appendChild(checkbox);
@@ -240,7 +240,7 @@ function renderFrequencyColumnPicker({ listElement, pickerElement, csvHeaders, o
 
     const badge = document.createElement("span");
     badge.className = "column-badge " + (hasFreq ? "ok" : "missing-csv");
-    badge.textContent = hasFreq ? "disponível" : "ausente no CSV";
+    badge.textContent = hasFreq ? "available" : "missing in CSV";
 
     label.appendChild(checkbox);
     label.appendChild(text);
@@ -269,8 +269,8 @@ function validateParsedCsv({
         csvElemDescDiv.innerHTML = 0;
         csvElemDescDiv.classList.add("red-color");
         csvElemDescDiv.classList.remove("green-color");
-        const skipMsg = skippedCount > 0 ? ` (${skippedCount} linha(s) ignorada(s))` : "";
-        throw new Error("CSV vazio ou inválido." + skipMsg);
+        const skipMsg = skippedCount > 0 ? ` (${skippedCount} row(s) skipped)` : "";
+        throw new Error("CSV is empty or invalid." + skipMsg);
     }
 
     csvHeaderOkDiv.innerHTML = parsedHeaders.join(", ");
@@ -282,13 +282,13 @@ function validateParsedCsv({
         csvElemDescDiv.classList.add("red-color");
         csvElemDescDiv.classList.remove("green-color");
         step_status.innerHTML = "&#10060;";
-        throw new Error("CSV precisa ter a coluna MATRICULA.");
+        throw new Error("CSV must include a MATRICULA column.");
     }
 
     if (!selectedColumns || selectedColumns.length <= 0) {
         parentStep3.style.display = "none";
         step_status.innerHTML = "&#10060;";
-        throw new Error("Selecione ao menos uma coluna para preencher.");
+        throw new Error("Select at least one column to fill.");
     }
 
     csvHeaderOkDiv.classList.add("green-color");
@@ -300,7 +300,7 @@ function validateParsedCsv({
         csvElemDescDiv.classList.add("red-color");
         csvElemDescDiv.classList.remove("green-color");
         step_status.innerHTML = "&#10060;";
-        throw new Error("CSV sem linhas válidas.");
+        throw new Error("CSV has no valid rows.");
     }
 
     csvElemDescDiv.classList.add("green-color");
@@ -308,9 +308,9 @@ function validateParsedCsv({
     step_status.innerHTML = "&#9989;";
     parentStep3.style.display = "block";
 
-    let statusMsg = "CSV pronto. Colunas: " + selectedColumns.join(", ");
+    let statusMsg = "CSV ready. Columns: " + selectedColumns.join(", ");
     if (skippedCount > 0) {
-        statusMsg += `. ${skippedCount} linha(s) ignorada(s) (matrícula ou notas vazias).`;
+        statusMsg += `. ${skippedCount} row(s) skipped (empty matricula or grades).`;
     }
     showStatus(statusMsg, "success");
 
@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             chrome.tabs.sendMessage(tab.id, { action: "check_if_in_total_freq_page" }, (response) => {
                 if (chrome.runtime.lastError) {
                     document.getElementById('invalid-url-msg').style.display = 'block';
-                    showStatus("Erro: recarregue a página e tente novamente.", "error");
+                    showStatus("Error: refresh the page and try again.", "error");
                     return;
                 }
 
@@ -467,7 +467,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             chrome.tabs.sendMessage(tab.id, { action: "get_av_headers" }, (response) => {
                 if (chrome.runtime.lastError) {
-                    showStatus("Erro: recarregue a página e tente novamente.", "error");
+                    showStatus("Error: refresh the page and try again.", "error");
                     return;
                 }
 
@@ -487,7 +487,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         restoreCsvUi(savedState);
                     }
                 } else {
-                    showStatus(`Erro: ${response.message}`, "error");
+                    showStatus(`Error: ${response.message}`, "error");
                     headersAVFoundDiv.classList.add("red-color");
                     headersAVFoundDiv.classList.remove("green-color");
                     headersAVFoundDiv.innerHTML = "None";
@@ -502,7 +502,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function handleGradesCsvText(text) {
         try {
             if (!headersAV || pageHeaders.length === 0) {
-                throw new Error("Aguarde o passo 1 terminar antes de enviar o CSV.");
+                throw new Error("Wait for step 1 to finish before uploading the CSV.");
             }
 
             var parseResult = parseCSV(text);
@@ -590,7 +590,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (!parsedData || selectedColumns.length === 0) {
-            showStatus("Nenhum dado CSV ou coluna selecionada.", "error");
+            showStatus("No CSV data or selected columns available.", "error");
             return;
         }
 
@@ -602,14 +602,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             columns: selectedColumns
         }, (response) => {
             if (chrome.runtime.lastError) {
-                showStatus("Erro: recarregue a página e tente novamente.", "error");
+                showStatus("Error: refresh the page and try again.", "error");
                 return;
             }
 
             if (response && response.status === "success") {
-                showStatus(`Sucesso! ${response.message}.`, "success");
+                showStatus(`Success! ${response.message}.`, "success");
             } else {
-                showStatus(`Erro: ${response.message}`, "error");
+                showStatus(`Error: ${response.message}`, "error");
             }
         });
     });
@@ -641,7 +641,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (!parsedData || selectedColumns.length === 0) {
-            showStatus("Nenhum dado CSV ou coluna selecionada.", "error");
+            showStatus("No CSV data or selected columns available.", "error");
             return;
         }
 
@@ -652,14 +652,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             data: Object.fromEntries(filtered.entries())
         }, (response) => {
             if (chrome.runtime.lastError) {
-                showStatus("Erro: recarregue a página e tente novamente.", "error");
+                showStatus("Error: refresh the page and try again.", "error");
                 return;
             }
 
             if (response && response.status === "success") {
-                showStatus(`Sucesso! ${response.message}.`, "success");
+                showStatus(`Success! ${response.message}.`, "success");
             } else {
-                showStatus(`Erro: ${response.message}`, "error");
+                showStatus(`Error: ${response.message}`, "error");
             }
         });
     });

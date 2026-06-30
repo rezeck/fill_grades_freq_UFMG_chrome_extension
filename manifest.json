@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "CSV Grade Filler - UFMG",
-    "version": "1.15",
+    "version": "1.16",
     "description": "Fills forms on a specific website using a CSV file.",
     "permissions": [
         "activeTab",
