@@ -1,32 +1,67 @@
+/**
+ * popup.js
+ *
+ * Logic for the extension popup (popup.html). It runs in the popup context and
+ * never touches the target page DOM directly; all page interaction goes through
+ * `chrome.tabs.sendMessage` to the content script (content.js).
+ *
+ * Responsibilities:
+ *   - Detect which mode the current tab is in (grades vs. frequency).
+ *   - Parse the uploaded CSV with PapaParse and validate it.
+ *   - Render the column picker and let the user choose which columns to fill.
+ *   - Persist the parsed CSV state per-tab in `chrome.storage.session` so the
+ *     UI survives the popup being closed by the OS file dialog.
+ *   - Send the selected data to the content script to be written into the page.
+ */
+
+/**
+ * Whether a matricula cell holds a usable (non-empty) value.
+ * @param {*} matricula
+ * @returns {boolean}
+ */
 function isValidMatricula(matricula) {
     return matricula != null && String(matricula).trim() !== "";
 }
 
+/**
+ * Whether a parsed CSV row has at least one non-empty value.
+ * @param {Object<string, *>} row
+ * @returns {boolean}
+ */
 function hasAnyDataValue(row) {
     return Object.values(row).some(
         (value) => value != null && String(value).trim() !== ""
     );
 }
 
+/**
+ * Parse CSV text into a matricula-keyed map of rows.
+ *
+ * Rows without a valid MATRICULA, or with no data values, are skipped and
+ * counted. The MATRICULA column is removed from each stored row (it becomes the
+ * map key). PapaParse runs synchronously here, so the `complete` callback fires
+ * before this function returns.
+ *
+ * @param {string} csvText raw CSV file contents
+ * @returns {{ data: Map<string, Object>, headers: string[] | undefined, skippedCount: number }}
+ */
 function parseCSV(csvText) {
-    var headersCSV = undefined;
     var skippedCount = 0;
 
     var csvData = Papa.parse(csvText, {
         header: true,
-        skipEmptyLines: true,
-        complete: function (results) {
-            headersCSV = results.meta.fields;
-
-            if (results.errors.length > 0) {
-                console.log("Parsing errors:", results.errors);
-            }
-
-            if (headersCSV.length <= 0) {
-                console.log("CSV headers empty");
-            }
-        }
+        skipEmptyLines: true
     });
+
+    var headersCSV = csvData.meta.fields;
+
+    if (csvData.errors.length > 0) {
+        console.log("Parsing errors:", csvData.errors);
+    }
+
+    if (!headersCSV || headersCSV.length <= 0) {
+        console.log("CSV headers empty");
+    }
 
     const dataMap = csvData.data.reduce((mapAccum, row) => {
         var matricula = row.MATRICULA;
@@ -54,15 +89,29 @@ function parseCSV(csvText) {
     };
 }
 
+/**
+ * Show a message in the popup status area.
+ * @param {string} msg HTML message to display
+ * @param {"success" | "error"} type controls the status styling class
+ */
 function showStatus(msg, type) {
     const statusDiv = document.getElementById('status');
-    statusDiv.textContent = msg;
+    statusDiv.innerHTML = msg;
     statusDiv.className = type;
     statusDiv.style.display = 'block';
 }
 
 const CSV_STORAGE_KEY = "csvState";
 
+/**
+ * Persist the parsed CSV state for a given tab in session storage.
+ * @param {string} tabUrl url used to scope the state to the originating tab
+ * @param {"grades" | "frequency"} mode
+ * @param {Map<string, Object>} data parsed rows keyed by matricula
+ * @param {string[]} headers CSV header names
+ * @param {string[]} selectedColumns columns the user chose to fill
+ * @returns {Promise<void>}
+ */
 async function saveCsvState(tabUrl, mode, data, headers, selectedColumns) {
     await chrome.storage.session.set({
         [CSV_STORAGE_KEY]: {
@@ -75,6 +124,11 @@ async function saveCsvState(tabUrl, mode, data, headers, selectedColumns) {
     });
 }
 
+/**
+ * Load previously persisted CSV state, but only if it belongs to `tabUrl`.
+ * @param {string} tabUrl
+ * @returns {Promise<{ mode: string, parsedData: Map<string, Object>, parsedHeaders: string[], selectedColumns: string[] } | undefined>}
+ */
 async function loadCsvState(tabUrl) {
     const stored = await chrome.storage.session.get(CSV_STORAGE_KEY);
     const state = stored[CSV_STORAGE_KEY];
@@ -90,6 +144,13 @@ async function loadCsvState(tabUrl) {
     };
 }
 
+/**
+ * Wire up a drag-and-drop CSV drop zone and its "browse" button.
+ * @param {HTMLElement} dropZone container that accepts dropped files
+ * @param {HTMLInputElement} fileInput hidden file input triggered by the button
+ * @param {HTMLElement} browseBtn button that opens the file dialog
+ * @param {(csvText: string) => void} onCsvText callback invoked with the file text
+ */
 function setupDropZone(dropZone, fileInput, browseBtn, onCsvText) {
     browseBtn.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -121,6 +182,11 @@ function setupDropZone(dropZone, fileInput, browseBtn, onCsvText) {
     });
 }
 
+/**
+ * Read a File as text and hand the contents to `onCsvText`.
+ * @param {File} file
+ * @param {(csvText: string) => void} onCsvText
+ */
 function readCsvFile(file, onCsvText) {
     const reader = new FileReader();
     reader.onload = (e) => onCsvText(e.target.result);
@@ -128,11 +194,23 @@ function readCsvFile(file, onCsvText) {
     reader.readAsText(file);
 }
 
+/**
+ * Collect the values of all checked checkboxes inside a column list element.
+ * @param {HTMLElement} listElement
+ * @returns {string[]} selected column names
+ */
 function getSelectedColumns(listElement) {
     return [...listElement.querySelectorAll('input[type="checkbox"]:checked')]
         .map((input) => input.value);
 }
 
+/**
+ * Produce a new map containing only the requested columns, dropping rows that
+ * end up with no values.
+ * @param {Map<string, Object>} dataMap
+ * @param {string[]} columns columns to keep
+ * @returns {Map<string, Object>}
+ */
 function filterDataByColumns(dataMap, columns) {
     const filtered = new Map();
     for (const [matricula, row] of dataMap) {
@@ -151,13 +229,16 @@ function filterDataByColumns(dataMap, columns) {
 }
 
 /**
+ * Render the grades column picker, showing every column present on the page
+ * and/or in the CSV, and enabling only those that appear in both (fillable).
+ *
  * @param {Object} config
- * @param {HTMLElement} config.listElement
- * @param {HTMLElement} config.pickerElement
- * @param {string[]} config.pageHeaders
- * @param {string[]} config.csvHeaders
- * @param {string[]|undefined} config.savedSelection
- * @param {() => void} config.onChange
+ * @param {HTMLElement} config.listElement container for the checkbox rows
+ * @param {HTMLElement} config.pickerElement wrapper shown once rendered
+ * @param {string[]} config.pageHeaders AV headers detected on the page
+ * @param {string[]} config.csvHeaders headers found in the CSV
+ * @param {string[]|undefined} config.savedSelection previously selected columns
+ * @param {() => void} config.onChange invoked whenever a checkbox toggles
  */
 function renderGradesColumnPicker({
     listElement,
@@ -221,6 +302,14 @@ function renderGradesColumnPicker({
     pickerElement.style.display = "block";
 }
 
+/**
+ * Render the frequency column picker, which only offers the single FREQ column.
+ * @param {Object} config
+ * @param {HTMLElement} config.listElement container for the checkbox row
+ * @param {HTMLElement} config.pickerElement wrapper shown once rendered
+ * @param {string[]} config.csvHeaders headers found in the CSV
+ * @param {() => void} config.onChange invoked when the checkbox toggles
+ */
 function renderFrequencyColumnPicker({ listElement, pickerElement, csvHeaders, onChange }) {
     listElement.innerHTML = "";
 
@@ -250,6 +339,24 @@ function renderFrequencyColumnPicker({ listElement, pickerElement, csvHeaders, o
     pickerElement.style.display = "block";
 }
 
+/**
+ * Validate parsed CSV state and update the step 2/3 UI accordingly.
+ *
+ * Throws (with a user-facing message) when the CSV is empty, lacks a MATRICULA
+ * column, or when no columns are selected. On success it reveals step 3 and
+ * shows a ready-to-fill status.
+ *
+ * @param {Object} config
+ * @param {Map<string, Object>} config.parsedData
+ * @param {string[]} config.parsedHeaders
+ * @param {HTMLElement} config.parentStep2
+ * @param {HTMLElement} config.parentStep3
+ * @param {HTMLElement} config.csvHeaderOkDiv element showing the header list
+ * @param {HTMLElement} config.csvElemDescDiv element showing the row count
+ * @param {string[]} config.selectedColumns
+ * @param {number} config.skippedCount rows skipped during parsing
+ * @returns {{ parsedData: Map<string, Object>, parsedHeaders: string[], selectedColumns: string[] }}
+ */
 function validateParsedCsv({
     parsedData,
     parsedHeaders,
@@ -342,11 +449,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const savedState = await loadCsvState(tab.url);
 
+    /** Persist the current parsed CSV/selection for this tab, if any. */
     function persistState() {
         if (!parsedData || !parsedHeaders) return;
         saveCsvState(tab.url, currentMode, parsedData, parsedHeaders, selectedColumns);
     }
 
+    /** Re-validate the grades step after the column selection changes. */
     function updateGradesStepFromSelection() {
         selectedColumns = getSelectedColumns(gradesColumnList);
         try {
@@ -367,6 +476,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /** Re-validate the frequency step after the column selection changes. */
     function updateFreqStepFromSelection() {
         selectedColumns = getSelectedColumns(freqColumnList);
         try {
@@ -387,6 +497,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Rebuild the step 2/3 UI from previously persisted state (used when the
+     * popup reopens after the OS file dialog closed it).
+     * @param {{ parsedData: Map<string, Object>, parsedHeaders: string[], selectedColumns: string[] }} state
+     */
     function restoreCsvUi(state) {
         parsedData = state.parsedData;
         parsedHeaders = state.parsedHeaders;
@@ -432,13 +547,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!tab.url.includes("localhost") &&
         !tab.url.includes("sistemas.ufmg.br/diario/frequenciaTurma/frequencia/solicitar/solicitarFrequencia.do") &&
         !tab.url.includes("sistemas.ufmg.br/diario/notaTurma/notaAvaliacao/solicitar/solicitarNota.do?acao=lancarAvaliacaoCompleta") &&
-        !tab.url.includes("homepages.dcc.ufmg.br/~hector.azpurua/notas_mock/")) {
+        !tab.url.includes("homepages.dcc.ufmg.br/~hector.azpurua/notas_mock/") &&
+        !tab.url.includes("homepages.dcc.ufmg.br/~hector.azpurua/faltas_mock/")) {
 
         document.getElementById('interface-grades').style.display = 'none';
         document.getElementById('interface-frequency').style.display = 'none';
         document.getElementById('invalid-url-msg').style.display = 'block';
     } else {
-        if (tab.url.includes("sistemas.ufmg.br/diario/frequenciaTurma/frequencia/solicitar/solicitarFrequencia.do")) {
+        if (tab.url.includes("sistemas.ufmg.br/diario/frequenciaTurma/frequencia/solicitar/solicitarFrequencia.do") ||
+            tab.url.includes("~hector.azpurua/faltas_mock")
+        ) {
             currentMode = "frequency";
             parentStep1 = document.getElementById('frequency-step-1');
             parentStep2 = document.getElementById('frequency-step-2');
@@ -499,6 +617,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Handle a grades CSV file's text: parse, render the picker and validate.
+     * @param {string} text raw CSV contents
+     */
     function handleGradesCsvText(text) {
         try {
             if (!headersAV || pageHeaders.length === 0) {
@@ -527,6 +649,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Handle a frequency CSV file's text: parse, render the picker and validate.
+     * @param {string} text raw CSV contents
+     */
     function handleFrequencyCsvText(text) {
         try {
             var parseResult = parseCSV(text);
@@ -547,6 +673,55 @@ document.addEventListener('DOMContentLoaded', async () => {
             parentStep3.style.display = "none";
             showStatus(err.message, "error");
         }
+    }
+
+    /**
+     * Wire a "fill" button: resolve the current CSV data (restoring from
+     * storage if needed), filter it by the selected columns and send it to the
+     * content script.
+     * @param {Object} config
+     * @param {string} config.buttonId id of the fill button
+     * @param {"grades" | "frequency"} config.mode
+     * @param {string} config.action content-script action to invoke
+     * @param {HTMLElement} config.listElement column list to read the selection from
+     */
+    function setupFillButton({ buttonId, mode, action, listElement }) {
+        document.getElementById(buttonId).addEventListener('click', async () => {
+            if (!parsedData) {
+                const restored = await loadCsvState(tab.url);
+                if (restored && restored.mode === mode) {
+                    parsedData = restored.parsedData;
+                    selectedColumns = restored.selectedColumns || [];
+                }
+            } else {
+                selectedColumns = getSelectedColumns(listElement);
+            }
+
+            if (!parsedData || selectedColumns.length === 0) {
+                showStatus("No CSV data or selected columns available.", "error");
+                return;
+            }
+
+            const filtered = filterDataByColumns(parsedData, selectedColumns);
+
+            const message = { action, data: Object.fromEntries(filtered.entries()) };
+            if (action === "fill_grade_form") {
+                message.columns = selectedColumns;
+            }
+
+            chrome.tabs.sendMessage(tab.id, message, (response) => {
+                if (chrome.runtime.lastError) {
+                    showStatus("Error: refresh the page and try again.", "error");
+                    return;
+                }
+
+                if (response && response.status === "success") {
+                    showStatus(`Success! ${response.message}.`, "success");
+                } else {
+                    showStatus(`Error: ${response.message}`, "error");
+                }
+            });
+        });
     }
 
     const csvInput = document.getElementById('csvInput');
@@ -578,40 +753,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateGradesStepFromSelection();
     });
 
-    document.getElementById('fillGradesBtn').addEventListener('click', async () => {
-        if (!parsedData) {
-            const restored = await loadCsvState(tab.url);
-            if (restored && restored.mode === "grades") {
-                parsedData = restored.parsedData;
-                selectedColumns = restored.selectedColumns || [];
-            }
-        } else {
-            selectedColumns = getSelectedColumns(gradesColumnList);
-        }
-
-        if (!parsedData || selectedColumns.length === 0) {
-            showStatus("No CSV data or selected columns available.", "error");
-            return;
-        }
-
-        const filtered = filterDataByColumns(parsedData, selectedColumns);
-
-        chrome.tabs.sendMessage(tab.id, {
-            action: "fill_grade_form",
-            data: Object.fromEntries(filtered.entries()),
-            columns: selectedColumns
-        }, (response) => {
-            if (chrome.runtime.lastError) {
-                showStatus("Error: refresh the page and try again.", "error");
-                return;
-            }
-
-            if (response && response.status === "success") {
-                showStatus(`Success! ${response.message}.`, "success");
-            } else {
-                showStatus(`Error: ${response.message}`, "error");
-            }
-        });
+    setupFillButton({
+        buttonId: 'fillGradesBtn',
+        mode: 'grades',
+        action: 'fill_grade_form',
+        listElement: gradesColumnList
     });
 
     const freqCsvInput = document.getElementById('freqCsvInput');
@@ -629,38 +775,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         handleFrequencyCsvText
     );
 
-    document.getElementById('fillFreqBtn').addEventListener('click', async () => {
-        if (!parsedData) {
-            const restored = await loadCsvState(tab.url);
-            if (restored && restored.mode === "frequency") {
-                parsedData = restored.parsedData;
-                selectedColumns = restored.selectedColumns || [];
-            }
-        } else {
-            selectedColumns = getSelectedColumns(freqColumnList);
-        }
-
-        if (!parsedData || selectedColumns.length === 0) {
-            showStatus("No CSV data or selected columns available.", "error");
-            return;
-        }
-
-        const filtered = filterDataByColumns(parsedData, selectedColumns);
-
-        chrome.tabs.sendMessage(tab.id, {
-            action: "fill_frequency_form",
-            data: Object.fromEntries(filtered.entries())
-        }, (response) => {
-            if (chrome.runtime.lastError) {
-                showStatus("Error: refresh the page and try again.", "error");
-                return;
-            }
-
-            if (response && response.status === "success") {
-                showStatus(`Success! ${response.message}.`, "success");
-            } else {
-                showStatus(`Error: ${response.message}`, "error");
-            }
-        });
+    setupFillButton({
+        buttonId: 'fillFreqBtn',
+        mode: 'frequency',
+        action: 'fill_frequency_form',
+        listElement: freqColumnList
     });
 });

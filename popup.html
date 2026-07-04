@@ -19,7 +19,7 @@
 
         <div id="frequency-step-1">
             <p class="slim-no-margin" style="font-weight: bold; text-decoration: underline;">
-                <span class="step-status">&#10060;</span> Step 1: Check for total frequency headers
+                Step 1: Check for total frequency headers <span class="step-status">&#10060;</span>
             </p>
             <ul>
                 <li><b>Headers found:</b> <span id="headersFreqFound" class="red-color">None</span></li>
@@ -35,11 +35,13 @@
                 <li>N&deg; valid rows: <span id="freqCsvElementsDesc" class="red-color">0</span></li>
             </ul>
 
-            <p class="popup-note">Drag the CSV below. If you choose a file, the popup may close - reopen it afterward.</p>
             <div class="drop-zone" id="freqCsvDropZone">
                 <span class="drop-zone-icon">&#128196;</span>
                 <p class="drop-hint">Drag the CSV here</p>
                 <button type="button" class="file-btn" id="freqCsvBrowseBtn">Choose file</button>
+                <p class="popup-note">If you choose a file, the popup may close - reopen it
+                    afterward.
+                </p>
                 <input type="file" id="freqCsvInput" accept=".csv" />
             </div>
 
@@ -81,11 +83,13 @@
                 <li>N&deg; valid rows: <span id="csvElementsDesc" class="red-color">0</span></li>
             </ul>
 
-            <p class="popup-note">Drag the CSV below. If you choose a file, the popup may close - reopen it afterward.</p>
             <div class="drop-zone" id="csvDropZone">
                 <span class="drop-zone-icon">&#128196;</span>
                 <p class="drop-hint">Drag the CSV here</p>
                 <button type="button" class="file-btn" id="csvBrowseBtn">Choose file</button>
+                <p class="popup-note">If you choose a file, the popup may close - reopen it
+                    afterward.
+                </p>
                 <input type="file" id="csvInput" accept=".csv" />
             </div>
 

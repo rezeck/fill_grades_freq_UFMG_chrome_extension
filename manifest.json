@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "CSV Grade Filler - UFMG",
-    "version": "1.16",
-    "description": "Fills forms on a specific website using a CSV file.",
+    "version": "1.17",
+    "description": "Fills forms on a the Diario de Classe website using CSV files.",
     "permissions": [
         "activeTab",
         "commands",
@@ -35,6 +35,7 @@
             "matches": [
                 "*://localhost/*",
                 "*://homepages.dcc.ufmg.br/~hector.azpurua/notas_mock/*",
+                "*://homepages.dcc.ufmg.br/~hector.azpurua/faltas_mock/*",
                 "*://sistemas.ufmg.br/diario/notaTurma/notaAvaliacao/solicitar/*",
                 "*://sistemas.ufmg.br/diario/frequenciaTurma/frequencia/solicitar/*"
             ],
