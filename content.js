@@ -4,11 +4,12 @@
  * Content script injected into UFMG's `Diario de Classe` pages (and the mock
  * test pages). It has direct access to the page DOM and is responsible for:
  *   - Reading the list of evaluation (AV) column headers from the grades page.
- *   - Filling grade inputs from CSV data sent by the popup.
- *   - Filling the total-frequency inputs from CSV data sent by the popup.
+ *   - Filling grade inputs from CSV data sent by the side panel.
+ *   - Filling the total-frequency inputs from CSV data sent by the side panel.
  *
- * The popup (popup.js) never touches the page DOM directly; it communicates
- * with this script exclusively through `chrome.tabs.sendMessage`. Each message
+ * The side panel (sidepanel.js) never touches the page DOM directly; it
+ * communicates with this script exclusively through `chrome.tabs.sendMessage`.
+ * Each message
  * carries an `action` and this script replies via `sendResponse` with a
  * `{ status: "success" | "error", message?: string }` object.
  */
@@ -87,7 +88,7 @@ function getAvHeadersMap() {
 /**
  * Message router for the content script.
  *
- * Handles the four actions used by the popup:
+ * Handles the four actions used by the side panel:
  *   - "get_av_headers": return the comma-separated AV header labels.
  *   - "fill_grade_form": write grade values into the page inputs.
  *   - "check_if_in_total_freq_page": verify the current page is the total

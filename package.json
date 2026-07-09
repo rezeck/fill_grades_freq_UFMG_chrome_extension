@@ -1,0 +1,14 @@
+{
+  "name": "fill-grades-freq-ufmg-chrome-extension",
+  "version": "1.18.0",
+  "private": true,
+  "description": "Chrome extension that fills grades and frequency forms on UFMG's Diario de Classe from CSV files.",
+  "scripts": {
+    "build:css": "tailwindcss -i tailwind.input.css -o style.css --minify",
+    "watch:css": "tailwindcss -i tailwind.input.css -o style.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.2",
+    "tailwindcss": "^4.3.2"
+  }
+}

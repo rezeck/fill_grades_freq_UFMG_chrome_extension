@@ -1,16 +1,19 @@
 /**
- * popup.js
+ * sidepanel.js
  *
- * Logic for the extension popup (popup.html). It runs in the popup context and
- * never touches the target page DOM directly; all page interaction goes through
- * `chrome.tabs.sendMessage` to the content script (content.js).
+ * Logic for the extension side panel (sidepanel.html). It runs in the side
+ * panel context and never touches the target page DOM directly; all page
+ * interaction goes through `chrome.tabs.sendMessage` to the content script
+ * (content.js).
  *
  * Responsibilities:
- *   - Detect which mode the current tab is in (grades vs. frequency).
+ *   - Detect which mode the current tab is in (grades vs. frequency) and
+ *     refresh the UI whenever the active tab changes or navigates, since the
+ *     side panel stays open across tabs (unlike the old popup).
  *   - Parse the uploaded CSV with PapaParse and validate it.
  *   - Render the column picker and let the user choose which columns to fill.
  *   - Persist the parsed CSV state per-tab in `chrome.storage.session` so the
- *     UI survives the popup being closed by the OS file dialog.
+ *     UI survives the panel being closed and reopened.
  *   - Send the selected data to the content script to be written into the page.
  */
 
@@ -90,7 +93,7 @@ function parseCSV(csvText) {
 }
 
 /**
- * Show a message in the popup status area.
+ * Show a message in the side panel status area.
  * @param {string} msg HTML message to display
  * @param {"success" | "error"} type controls the status styling class
  */
@@ -429,6 +432,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     var parentStep1 = document.getElementById('grades-step-1');
     var parentStep2 = document.getElementById('grades-step-2');
     var parentStep3 = document.getElementById('grades-step-3');
+    var tab = undefined;
     var parsedData = undefined;
     var parsedHeaders = undefined;
     var selectedColumns = [];
@@ -437,17 +441,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     var pageHeaders = [];
     var currentMode = "grades";
 
+    // Bumped on every refresh; in-flight callbacks from a previous tab compare
+    // against it and bail out instead of drawing stale results into the panel.
+    var refreshToken = 0;
+
     const gradesColumnList = document.getElementById('gradesColumnList');
     const gradesColumnPicker = document.getElementById('grades-column-picker');
     const freqColumnList = document.getElementById('freqColumnList');
     const freqColumnPicker = document.getElementById('frequency-column-picker');
-
-    let [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true
-    });
-
-    const savedState = await loadCsvState(tab.url);
 
     /** Persist the current parsed CSV/selection for this tab, if any. */
     function persistState() {
@@ -499,7 +500,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Rebuild the step 2/3 UI from previously persisted state (used when the
-     * popup reopens after the OS file dialog closed it).
+     * side panel reopens, or when the user returns to a tab whose CSV was
+     * already uploaded).
      * @param {{ parsedData: Map<string, Object>, parsedHeaders: string[], selectedColumns: string[] }} state
      */
     function restoreCsvUi(state) {
@@ -544,16 +546,103 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    if (!tab.url.includes("localhost") &&
-        !tab.url.includes("sistemas.ufmg.br/diario/frequenciaTurma/frequencia/solicitar/solicitarFrequencia.do") &&
-        !tab.url.includes("sistemas.ufmg.br/diario/notaTurma/notaAvaliacao/solicitar/solicitarNota.do?acao=lancarAvaliacaoCompleta") &&
-        !tab.url.includes("homepages.dcc.ufmg.br/~hector.azpurua/notas_mock/") &&
-        !tab.url.includes("homepages.dcc.ufmg.br/~hector.azpurua/faltas_mock/")) {
+    /**
+     * Return the panel to its initial state: both interfaces hidden, steps
+     * collapsed, indicators reset and the in-memory CSV state discarded.
+     * Called before re-detecting the mode whenever the active tab changes.
+     */
+    function resetUi() {
+        parsedData = undefined;
+        parsedHeaders = undefined;
+        selectedColumns = [];
+        skippedCount = 0;
+        headersAV = undefined;
+        pageHeaders = [];
+        currentMode = "grades";
+        parentStep1 = document.getElementById('grades-step-1');
+        parentStep2 = document.getElementById('grades-step-2');
+        parentStep3 = document.getElementById('grades-step-3');
 
-        document.getElementById('interface-grades').style.display = 'none';
-        document.getElementById('interface-frequency').style.display = 'none';
-        document.getElementById('invalid-url-msg').style.display = 'block';
-    } else {
+        document.getElementById('interface-grades').style.display = "none";
+        document.getElementById('interface-frequency').style.display = "none";
+        document.getElementById('invalid-url-msg').style.display = "none";
+
+        for (const id of ['grades-step-2', 'grades-step-3', 'frequency-step-2', 'frequency-step-3']) {
+            document.getElementById(id).style.display = "none";
+        }
+        gradesColumnPicker.style.display = "none";
+        freqColumnPicker.style.display = "none";
+
+        for (const [headerFoundId, step1Selector] of [
+            ['headersAVFound', '#grades-step-1 .step-status'],
+            ['headersFreqFound', '#frequency-step-1 .step-status']
+        ]) {
+            const headerFoundDiv = document.getElementById(headerFoundId);
+            headerFoundDiv.classList.add("red-color");
+            headerFoundDiv.classList.remove("green-color");
+            headerFoundDiv.innerHTML = "None";
+            document.querySelector(step1Selector).innerHTML = "&#10060;";
+        }
+
+        for (const [headerOkId, elemDescId, step2Selector] of [
+            ['csvHeadersOK', 'csvElementsDesc', '#grades-step-2 .step-status'],
+            ['freqCsvHeadersOK', 'freqCsvElementsDesc', '#frequency-step-2 .step-status']
+        ]) {
+            const headerOkDiv = document.getElementById(headerOkId);
+            headerOkDiv.classList.add("red-color");
+            headerOkDiv.classList.remove("green-color");
+            headerOkDiv.innerHTML = "-";
+            const elemDescDiv = document.getElementById(elemDescId);
+            elemDescDiv.classList.add("red-color");
+            elemDescDiv.classList.remove("green-color");
+            elemDescDiv.innerHTML = "0";
+            document.querySelector(step2Selector).innerHTML = "";
+        }
+
+        const statusDiv = document.getElementById('status');
+        statusDiv.innerHTML = "";
+        statusDiv.className = "";
+        statusDiv.style.display = "none";
+    }
+
+    /**
+     * Detect the mode for the current active tab and rebuild the panel UI.
+     * Unlike a popup, the side panel stays open across tab switches and page
+     * navigations, so this runs again on every tabs.onActivated / onUpdated
+     * event (see the listeners at the bottom).
+     */
+    async function refreshForActiveTab() {
+        const token = ++refreshToken;
+
+        const [activeTab] = await chrome.tabs.query({
+            active: true,
+            lastFocusedWindow: true
+        });
+
+        if (token !== refreshToken) return;
+
+        resetUi();
+
+        if (!activeTab || !activeTab.url) {
+            document.getElementById('invalid-url-msg').style.display = 'block';
+            return;
+        }
+
+        tab = activeTab;
+
+        const savedState = await loadCsvState(tab.url);
+        if (token !== refreshToken) return;
+
+        if (!tab.url.includes("localhost") &&
+            !tab.url.includes("sistemas.ufmg.br/diario/frequenciaTurma/frequencia/solicitar/solicitarFrequencia.do") &&
+            !tab.url.includes("sistemas.ufmg.br/diario/notaTurma/notaAvaliacao/solicitar/solicitarNota.do?acao=lancarAvaliacaoCompleta") &&
+            !tab.url.includes("homepages.dcc.ufmg.br/~hector.azpurua/notas_mock/") &&
+            !tab.url.includes("homepages.dcc.ufmg.br/~hector.azpurua/faltas_mock/")) {
+
+            document.getElementById('invalid-url-msg').style.display = 'block';
+            return;
+        }
+
         if (tab.url.includes("sistemas.ufmg.br/diario/frequenciaTurma/frequencia/solicitar/solicitarFrequencia.do") ||
             tab.url.includes("~hector.azpurua/faltas_mock")
         ) {
@@ -563,6 +652,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             parentStep3 = document.getElementById('frequency-step-3');
 
             chrome.tabs.sendMessage(tab.id, { action: "check_if_in_total_freq_page" }, (response) => {
+                if (token !== refreshToken) return;
+
                 if (chrome.runtime.lastError) {
                     document.getElementById('invalid-url-msg').style.display = 'block';
                     showStatus("Error: refresh the page and try again.", "error");
@@ -584,6 +675,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('interface-grades').style.display = 'flex';
 
             chrome.tabs.sendMessage(tab.id, { action: "get_av_headers" }, (response) => {
+                if (token !== refreshToken) return;
+
                 if (chrome.runtime.lastError) {
                     showStatus("Error: refresh the page and try again.", "error");
                     return;
@@ -780,5 +873,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         mode: 'frequency',
         action: 'fill_frequency_form',
         listElement: freqColumnList
+    });
+
+    await refreshForActiveTab();
+
+    // The side panel outlives tab switches and navigations, so keep the UI in
+    // sync with whichever tab is active.
+    chrome.tabs.onActivated.addListener(() => {
+        refreshForActiveTab();
+    });
+
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, updatedTab) => {
+        if (updatedTab.active && changeInfo.status === "complete") {
+            refreshForActiveTab();
+        }
     });
 });

@@ -1,11 +1,13 @@
 {
     "manifest_version": 3,
     "name": "CSV Grade Filler - UFMG",
-    "version": "1.17",
+    "version": "1.18",
     "description": "Fills forms on a the Diario de Classe website using CSV files.",
+    "minimum_chrome_version": "114",
     "permissions": [
         "activeTab",
         "commands",
+        "sidePanel",
         "storage",
         "tabs"
     ],
@@ -22,8 +24,11 @@
             "description": "Reload the extension"
         }
     },
+    "side_panel": {
+        "default_path": "sidepanel.html"
+    },
     "action": {
-        "default_popup": "popup.html",
+        "default_title": "Open the UFMG Auto-Filler side panel",
         "default_icon": {
             "16": "icons/icon16.png",
             "48": "icons/icon48.png",

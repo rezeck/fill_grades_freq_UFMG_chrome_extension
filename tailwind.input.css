@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind source for the side panel. Build it into style.css with:
+ *   npm run build:css
+ *
+ * The classes below are referenced from sidepanel.js (classList toggles and
+ * elements created at runtime), so they cannot live as inline utilities in
+ * sidepanel.html and are defined as components instead.
+ */
+@layer components {
+
+    /* Validation state colors toggled on header/row-count spans. */
+    .red-color {
+        @apply text-red-600;
+    }
+
+    .green-color {
+        @apply text-emerald-600;
+    }
+
+    /* Status area: showStatus() replaces the whole className with
+       "success" / "error", so the base styles must hang off the id. */
+    #status {
+        @apply mt-3 hidden rounded-xl border px-3 py-2.5 text-center text-xs leading-relaxed;
+    }
+
+    #status.success {
+        @apply border-emerald-200 bg-emerald-50 text-emerald-800;
+    }
+
+    #status.error {
+        @apply border-red-200 bg-red-50 text-red-700;
+    }
+
+    /* CSV drop zone; "drag-over" is toggled while a file hovers over it. */
+    .drop-zone {
+        @apply flex min-h-[92px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center transition-colors;
+    }
+
+    .drop-zone.drag-over {
+        @apply border-blue-500 bg-blue-50;
+    }
+
+    .drop-zone input[type="file"] {
+        @apply hidden;
+    }
+
+    /* Column picker rows and badges are created dynamically in sidepanel.js. */
+    .column-option {
+        @apply flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs select-none;
+    }
+
+    .column-option:hover:not(.column-unavailable) {
+        @apply bg-slate-100;
+    }
+
+    .column-option input[type="checkbox"] {
+        @apply m-0 shrink-0 accent-blue-600;
+    }
+
+    .column-option.column-unavailable {
+        @apply cursor-default text-slate-400;
+    }
+
+    .column-badge {
+        @apply ml-auto rounded-full px-2 py-px text-[10px] font-medium whitespace-nowrap;
+    }
+
+    .column-badge.ok {
+        @apply bg-emerald-100 text-emerald-700;
+    }
+
+    .column-badge.missing-page {
+        @apply bg-amber-100 text-amber-700;
+    }
+
+    .column-badge.missing-csv {
+        @apply bg-pink-100 text-pink-700;
+    }
+}

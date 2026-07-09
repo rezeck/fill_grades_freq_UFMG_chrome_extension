@@ -37,8 +37,13 @@ This project is based upon the developments of:
 
 ## Reference Google Sheets template
 
-This project shares a reference Google Sheets template to use with the plugin and make easier to create the CSV files, however its not required and you can use any way you prefer to generate the CSV files.
+You can use the following website to create a Google Sheets document with all the required data and formats used by this plugin:
+- https://gradesheet.azpurua.com.br/
+
+ Another reference Google Sheets template to make easier to create the CSV file:
 - Link: https://docs.google.com/spreadsheets/d/1uWSjpvj_RxTTfcZLw65nmbQy1QyCrp93ZFVv3f9kufw/edit?usp=sharing
+
+However its not required to use any particular template, you can use any way you prefer to generate the CSV files in the following format.
 
 <div align="center">
     <a href="https://docs.google.com/spreadsheets/d/1uWSjpvj_RxTTfcZLw65nmbQy1QyCrp93ZFVv3f9kufw/edit?usp=sharing" target="_blank">
@@ -53,11 +58,11 @@ This project shares a reference Google Sheets template to use with the plugin an
 Both modes read a plain UTF-8 CSV whose **first row is a header**. Every row must
 have a `MATRICULA` column holding the student's enrollment number — this is the
 key used to match a row to an input on the page. Rows with an empty `MATRICULA`,
-or with no data values, are skipped (and reported as "skipped" in the popup).
+or with no data values, are skipped (and reported as "skipped" in the side panel).
 
 **Grades CSV** — besides `MATRICULA`, add one column per evaluation using the
 exact label shown on the page (e.g. `AV1`, `AV2`, `EE`). Only columns that exist
-both in the CSV **and** on the page are fillable; the popup's column picker marks
+both in the CSV **and** on the page are fillable; the side panel's column picker marks
 each column as `page + CSV`, `CSV only`, or `page only`. Decimal grades may use a
 dot or a comma — dots are converted to commas automatically before filling.
 
@@ -91,7 +96,7 @@ Sample files (including intentionally malformed ones for testing) live in
 
 ### Filling grades
 
-- *Step 0*: Inside `Diario de Classe`, go to the page `Notas/Lançamento de Notas/Todas as Avaliações` and click on the extension icon
+- *Step 0*: Inside `Diario de Classe`, go to the page `Notas/Lançamento de Notas/Todas as Avaliações` and click on the extension icon to open the side panel
 <div align="center">
   <img src="https://github.com/user-attachments/assets/6602d9fd-0c56-40f6-8383-c3dbb8652030" alt="Step 0" style="text-align:center; width:25%">
 </div>
@@ -118,7 +123,7 @@ Sample files (including intentionally malformed ones for testing) live in
 The frequency workflow mirrors the grades one and the extension switches to it
 automatically based on the page URL:
 
-- *Step 0*: Inside `Diario de Classe`, go to the `Frequência/Lançamento do Total de Faltas no Semestre` page and click on the extension icon.
+- *Step 0*: Inside `Diario de Classe`, go to the `Frequência/Lançamento do Total de Faltas no Semestre` page and click on the extension icon to open the side panel.
 - *Step 1*: Verify that `step 1` shows the green mark — this confirms the extension detected the total-frequency form (`FREQ`).
 - *Step 2*: Upload the frequency CSV (with `MATRICULA` and `FREQ` columns) and confirm the green check on `step 2`.
 - *Step 3*: Click the `Fill frequency` button and check how many rows were filled.
@@ -147,31 +152,52 @@ Manifest V3 Chrome extension. The moving parts:
 
 | File | Role |
 | --- | --- |
-| [`manifest.json`](manifest.json) | Extension manifest: permissions, the pages the content script is injected into, the popup action and the `reload` dev command. |
-| [`popup.html`](popup.html) / [`style.css`](style.css) | Popup markup and styles (the two-panel grades / frequency UI). |
-| [`popup.js`](popup.js) | Popup logic: CSV parsing (PapaParse), validation, the column picker, per-tab session persistence, and messaging to the content script. Touches the page only via `chrome.tabs.sendMessage`. |
-| [`content.js`](content.js) | Content script injected into the target pages. Reads the AV headers and writes grade/frequency values into the form inputs; replies to popup messages with a `{ status, message }` object. |
-| [`service.js`](service.js) | Background service worker; reloads the extension on the `reload` keyboard shortcut (dev convenience). |
-| [`js/papaparse.min.js`](js/papaparse.min.js) | Vendored [PapaParse](https://www.papaparse.com/) CSV parser, loaded by both the popup and the content script. |
+| [`manifest.json`](manifest.json) | Extension manifest: permissions, the pages the content script is injected into, the side panel entry and the `reload` dev command. |
+| [`sidepanel.html`](sidepanel.html) | Side panel markup (the two-panel grades / frequency UI), styled with [Tailwind CSS](https://tailwindcss.com/) utility classes. |
+| [`tailwind.input.css`](tailwind.input.css) / [`style.css`](style.css) | Tailwind source and its compiled output. `style.css` is **generated** — edit `tailwind.input.css` and run `npm run build:css` instead of editing it directly. |
+| [`sidepanel.js`](sidepanel.js) | Side panel logic: CSV parsing (PapaParse), validation, the column picker, per-tab session persistence, active-tab tracking, and messaging to the content script. Touches the page only via `chrome.tabs.sendMessage`. |
+| [`content.js`](content.js) | Content script injected into the target pages. Reads the AV headers and writes grade/frequency values into the form inputs; replies to side panel messages with a `{ status, message }` object. |
+| [`service.js`](service.js) | Background service worker; opens the side panel when the toolbar icon is clicked and reloads the extension on the `reload` keyboard shortcut (dev convenience). |
+| [`js/papaparse.min.js`](js/papaparse.min.js) | Vendored [PapaParse](https://www.papaparse.com/) CSV parser, loaded by both the side panel and the content script. |
 | [`test_csv_files/`](test_csv_files/) | Sample good and deliberately-malformed CSVs for manual testing. |
 | [`PRIVACY.md`](PRIVACY.md) | Privacy policy (the extension collects and transmits no data). |
 
 ### How it works
 
-1. The popup opens and, from the active tab's URL, decides whether it is in
-   **grades** or **frequency** mode.
+1. Clicking the toolbar icon opens the side panel, which, from the active
+   tab's URL, decides whether it is in **grades** or **frequency** mode. The
+   panel stays open and re-detects the mode whenever the active tab changes or
+   navigates.
 2. It messages the content script to detect the page's evaluation headers
    (`get_av_headers`) or to confirm the total-frequency form
    (`check_if_in_total_freq_page`).
-3. The user uploads a CSV; the popup parses and validates it and renders the
-   column picker.
-4. On "Fill", the popup filters the parsed rows to the selected columns and
-   sends them to the content script (`fill_grade_form` / `fill_frequency_form`),
-   which writes the values into the page inputs and reports how many rows were
-   filled, blocked or not found.
+3. The user uploads a CSV; the side panel parses and validates it and renders
+   the column picker.
+4. On "Fill", the side panel filters the parsed rows to the selected columns
+   and sends them to the content script (`fill_grade_form` /
+   `fill_frequency_form`), which writes the values into the page inputs and
+   reports how many rows were filled, blocked or not found.
 
 All page interaction happens in the content script; no data ever leaves the
 browser.
+
+### Working on the styles
+
+The UI uses [Tailwind CSS](https://tailwindcss.com/) compiled ahead of time
+(extensions cannot load the CDN build because of MV3's content security
+policy). The compiled `style.css` is committed, so installing from source needs
+no build step. To change the styles:
+
+```sh
+npm install          # once
+npm run build:css    # rebuild style.css from tailwind.input.css
+npm run watch:css    # or rebuild on every change
+```
+
+Classes that `sidepanel.js` toggles or creates at runtime (`red-color`,
+`drag-over`, the column-picker rows, the `#status` alert, …) are defined as
+component classes in `tailwind.input.css`; everything static lives as utility
+classes in `sidepanel.html`.
 
 ## License
 
